@@ -16,6 +16,7 @@
 /debug32/
 /debug64/
 /builds/
+.vs/
 *.o.d
 *.ninja
 .ninja*
@@ -23,6 +24,9 @@
 
 #xcode
 *.xcodeproj/
+
+#clion
+.idea/
 
 #other stuff (windows stuff, qt moc stuff, etc)
 Release_MD/
@@ -32,6 +36,8 @@ x64/
 ipch/
 GeneratedFiles/
 .moc/
+/UI/obs.rc
+.vscode/
 
 /other/
 
@@ -41,6 +47,14 @@ depcomp
 install-sh
 Makefile.in
 Makefile
+
+#python
+__pycache__
+
+#sphinx
+/docs/sphinx/_build/*
+!/docs/sphinx/_build/.gitignore
+!/docs/sphinx/Makefile
 
 #random useless file stuff
 *.dmg
@@ -75,7 +89,6 @@ tags
 *.obj
 *.pdb
 *.res
-*.manifest
 *.dep
 *.zip
 *.lnk
