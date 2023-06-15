@@ -1,13 +1,3 @@
-/*****************************************************************************
-
-INTEL CORPORATION PROPRIETARY INFORMATION
-This software is supplied under the terms of a license agreement or
-nondisclosure agreement with Intel Corporation and may not be copied
-or disclosed except in accordance with the terms of that agreement.
-Copyright(c) 2005-2014 Intel Corporation. All Rights Reserved.
-
-*****************************************************************************/
-
 #include "common_utils.h"
 
 // ATTENTION: If D3D surfaces are used, DX9_D3D or DX11_D3D must be set in project settings or hardcoded here
@@ -27,8 +17,8 @@ mfxStatus Initialize(mfxIMPL impl, mfxVersion ver, MFXVideoSession *pSession,
 		     mfxFrameAllocator *pmfxAllocator, mfxHDL *deviceHandle,
 		     bool bCreateSharedHandles, bool dx9hack)
 {
-	bCreateSharedHandles; // (Hugh) Currently unused
-	pmfxAllocator;        // (Hugh) Currently unused
+	bCreateSharedHandles; // (Lain) Currently unused
+	pmfxAllocator;        // (Lain) Currently unused
 
 	mfxStatus sts = MFX_ERR_NONE;
 
@@ -128,7 +118,7 @@ double TimeDiffMsec(mfxTime tfinish, mfxTime tstart)
 	       freq;
 }
 
-/* (Hugh) Functions currently unused */
+/* (Lain) Functions currently unused */
 #if 0
 void ClearYUVSurfaceVMem(mfxMemId memId)
 {

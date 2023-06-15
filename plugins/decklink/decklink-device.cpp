@@ -1,4 +1,4 @@
-﻿#include <sstream>
+#include <sstream>
 
 #include "decklink-device.hpp"
 
@@ -30,10 +30,9 @@ ULONG DeckLinkDevice::Release()
 
 bool DeckLinkDevice::Init()
 {
-	ComPtr<IDeckLinkAttributes> attributes;
-	const HRESULT result = device->QueryInterface(IID_IDeckLinkAttributes,
-						      (void **)&attributes);
-
+	ComPtr<IDeckLinkProfileAttributes> attributes;
+	const HRESULT result = device->QueryInterface(
+		IID_IDeckLinkProfileAttributes, (void **)&attributes);
 	if (result == S_OK) {
 		decklink_bool_t detectable = false;
 		if (attributes->GetFlag(BMDDeckLinkSupportsInputFormatDetection,
@@ -50,9 +49,9 @@ bool DeckLinkDevice::Init()
 	ComPtr<IDeckLinkInput> input;
 	if (device->QueryInterface(IID_IDeckLinkInput, (void **)&input) ==
 	    S_OK) {
-		IDeckLinkDisplayModeIterator *modeIterator;
+		ComPtr<IDeckLinkDisplayModeIterator> modeIterator;
 		if (input->GetDisplayModeIterator(&modeIterator) == S_OK) {
-			IDeckLinkDisplayMode *displayMode;
+			ComPtr<IDeckLinkDisplayMode> displayMode;
 			long long modeId = 1;
 
 			while (modeIterator->Next(&displayMode) == S_OK) {
@@ -64,11 +63,8 @@ bool DeckLinkDevice::Init()
 							       modeId);
 				inputModes.push_back(mode);
 				inputModeIdMap[modeId] = mode;
-				displayMode->Release();
 				++modeId;
 			}
-
-			modeIterator->Release();
 		}
 	}
 
@@ -89,9 +85,9 @@ bool DeckLinkDevice::Init()
 	if (device->QueryInterface(IID_IDeckLinkOutput, (void **)&output) ==
 	    S_OK) {
 
-		IDeckLinkDisplayModeIterator *modeIterator;
+		ComPtr<IDeckLinkDisplayModeIterator> modeIterator;
 		if (output->GetDisplayModeIterator(&modeIterator) == S_OK) {
-			IDeckLinkDisplayMode *displayMode;
+			ComPtr<IDeckLinkDisplayMode> displayMode;
 			long long modeId = 1;
 
 			while (modeIterator->Next(&displayMode) == S_OK) {
@@ -103,11 +99,8 @@ bool DeckLinkDevice::Init()
 							       modeId);
 				outputModes.push_back(mode);
 				outputModeIdMap[modeId] = mode;
-				displayMode->Release();
 				++modeId;
 			}
-
-			modeIterator->Release();
 		}
 	}
 
@@ -120,6 +113,11 @@ bool DeckLinkDevice::Init()
 	// Sub Device Counts
 	attributes->GetInt(BMDDeckLinkSubDeviceIndex, &subDeviceIndex);
 	attributes->GetInt(BMDDeckLinkNumberOfSubDevices, &numSubDevices);
+
+	if (FAILED(attributes->GetInt(BMDDeckLinkMinimumPrerollFrames,
+				      &minimumPrerollFrames))) {
+		minimumPrerollFrames = 3;
+	}
 
 	decklink_string_t decklinkModelName;
 	decklink_string_t decklinkDisplayName;
@@ -260,6 +258,11 @@ int64_t DeckLinkDevice::GetSubDeviceCount()
 int64_t DeckLinkDevice::GetSubDeviceIndex()
 {
 	return subDeviceIndex;
+}
+
+int64_t DeckLinkDevice::GetMinimumPrerollFrames()
+{
+	return minimumPrerollFrames;
 }
 
 const std::string &DeckLinkDevice::GetName(void) const

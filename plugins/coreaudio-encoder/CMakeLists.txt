@@ -1,42 +1,35 @@
-project(coreaudio-encoder)
+cmake_minimum_required(VERSION 3.24...3.25)
 
-set(coreaudio-encoder_SOURCES
-	encoder.cpp)
+legacy_check()
 
-if (WIN32)
-	set(MODULE_DESCRIPTION "OBS Core Audio encoder")
-	configure_file(${CMAKE_SOURCE_DIR}/cmake/winrc/obs-module.rc.in coreaudio-encoder.rc)
-	list(APPEND coreaudio-encoder_SOURCES
-		coreaudio-encoder.rc)
-	set(coreaudio-encoder_HEADERS windows-imports.h)
-	set(coreaudio-encoder_LIBS )
-
-	if (MINGW)
-		set_source_files_properties(${coreaudio-encoder_SOURCES}
-			PROPERTIES COMPILE_FLAGS "-Wno-multichar")
-	endif()
-else()
-	find_library(COREFOUNDATION CoreFoundation)
-	find_library(COREAUDIO CoreAudio)
-	find_library(AUDIOTOOLBOX AudioToolbox)
-	set(coreaudio-encoder_HEADERS )
-	set(coreaudio-encoder_LIBS
-		${COREFOUNDATION}
-		${COREAUDIO}
-		${AUDIOTOOLBOX})
-
-	include_directories(${COREFOUNDATION}
-		${COREAUDIO}
-		${AUDIOTOOLBOX})
+if(OS_WINDOWS)
+  option(ENABLE_COREAUDIO_ENCODER "Enable building with CoreAudio encoder (Windows)" ON)
+  if(NOT ENABLE_COREAUDIO_ENCODER)
+    target_disable(coreaudio-encoder)
+    return()
+  endif()
 endif()
 
-add_library(coreaudio-encoder MODULE
-	${coreaudio-encoder_SOURCES}
-	${coreaudio-encoder_HEADERS})
+add_library(coreaudio-encoder MODULE)
+add_library(OBS::coreaudio-encoder ALIAS coreaudio-encoder)
 
-target_link_libraries(coreaudio-encoder
-	libobs
-	${coreaudio-encoder_LIBS})
-set_target_properties(coreaudio-encoder PROPERTIES FOLDER "plugins")
+target_sources(coreaudio-encoder PRIVATE encoder.cpp)
+target_link_libraries(coreaudio-encoder PRIVATE OBS::libobs)
 
-install_obs_plugin_with_data(coreaudio-encoder data)
+if(OS_WINDOWS)
+  target_compile_definitions(coreaudio-encoder PRIVATE UNICODE _UNICODE)
+
+  configure_file(cmake/windows/obs-module.rc.in coreaudio-encoder.rc)
+
+  target_sources(coreaudio-encoder PRIVATE coreaudio-encoder.rc windows-imports.h)
+elseif(OS_MACOS)
+  find_library(COREFOUNDATION CoreFoundation)
+  find_library(COREAUDIO CoreAudio)
+  find_library(AUDIOTOOLBOX AudioToolbox)
+  mark_as_advanced(AUDIOTOOLBOX COREAUDIO COREFOUNDATION)
+
+  target_link_libraries(coreaudio-encoder PRIVATE ${COREFOUNDATION} ${COREAUDIO} ${AUDIOTOOLBOX})
+
+endif()
+
+set_target_properties_obs(coreaudio-encoder PROPERTIES FOLDER plugins PREFIX "")

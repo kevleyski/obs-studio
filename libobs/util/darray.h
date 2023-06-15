@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013 Hugh Bailey <obs.jim@gmail.com>
+ * Copyright (c) 2023 Lain Bailey <lain@obsproject.com>
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -88,10 +88,12 @@ static inline void darray_reserve(const size_t element_size, struct darray *dst,
 		return;
 
 	ptr = bmalloc(element_size * capacity);
-	if (dst->num)
-		memcpy(ptr, dst->array, element_size * dst->num);
-	if (dst->array)
+	if (dst->array) {
+		if (dst->num)
+			memcpy(ptr, dst->array, element_size * dst->num);
+
 		bfree(dst->array);
+	}
 	dst->array = ptr;
 	dst->capacity = capacity;
 }
@@ -109,12 +111,19 @@ static inline void darray_ensure_capacity(const size_t element_size,
 	if (new_size > new_cap)
 		new_cap = new_size;
 	ptr = bmalloc(element_size * new_cap);
-	if (dst->capacity)
-		memcpy(ptr, dst->array, element_size * dst->capacity);
-	if (dst->array)
+	if (dst->array) {
+		if (dst->capacity)
+			memcpy(ptr, dst->array, element_size * dst->capacity);
+
 		bfree(dst->array);
+	}
 	dst->array = ptr;
 	dst->capacity = new_cap;
+}
+
+static inline void darray_clear(struct darray *dst)
+{
+	dst->num = 0;
 }
 
 static inline void darray_resize(const size_t element_size, struct darray *dst,
@@ -265,10 +274,10 @@ static inline void *darray_insert_new(const size_t element_size,
 	if (idx == dst->num)
 		return darray_push_back_new(element_size, dst);
 
-	item = darray_item(element_size, dst, idx);
-
 	move_count = dst->num - idx;
 	darray_ensure_capacity(element_size, dst, ++dst->num);
+
+	item = darray_item(element_size, dst, idx);
 	memmove(darray_item(element_size, dst, idx + 1), item,
 		move_count * element_size);
 
@@ -405,6 +414,11 @@ static inline void darray_move_item(const size_t element_size,
 		return;
 
 	temp = malloc(element_size);
+	if (!temp) {
+		bcrash("darray_move_item: out of memory");
+		return;
+	}
+
 	p_from = darray_item(element_size, dst, from);
 	p_to = darray_item(element_size, dst, to);
 
@@ -433,6 +447,9 @@ static inline void darray_swap(const size_t element_size, struct darray *dst,
 		return;
 
 	temp = malloc(element_size);
+	if (!temp)
+		bcrash("darray_swap: out of memory");
+
 	a_ptr = darray_item(element_size, dst, a);
 	b_ptr = darray_item(element_size, dst, b);
 
@@ -475,6 +492,8 @@ static inline void darray_swap(const size_t element_size, struct darray *dst,
 
 #define da_resize(v, size) darray_resize(sizeof(*v.array), &v.da, size)
 
+#define da_clear(v) darray_clear(&v.da)
+
 #define da_copy(dst, src) darray_copy(sizeof(*dst.array), &dst.da, &src.da)
 
 #define da_copy_array(dst, src_array, n) \
@@ -482,33 +501,137 @@ static inline void darray_swap(const size_t element_size, struct darray *dst,
 
 #define da_move(dst, src) darray_move(&dst.da, &src.da)
 
+#ifdef ENABLE_DARRAY_TYPE_TEST
+#ifdef __cplusplus
+#define da_type_test(v, item)                 \
+	({                                    \
+		if (false) {                  \
+			auto _t = v.array;    \
+			_t = (item);          \
+			(void)_t;             \
+			*(v).array = *(item); \
+		}                             \
+	})
+#else
+#define da_type_test(v, item)                       \
+	({                                          \
+		if (false) {                        \
+			const typeof(*v.array) *_t; \
+			_t = (item);                \
+			(void)_t;                   \
+			*(v).array = *(item);       \
+		}                                   \
+	})
+#endif
+#endif // ENABLE_DARRAY_TYPE_TEST
+
+#ifdef ENABLE_DARRAY_TYPE_TEST
+#define da_find(v, item, idx)                                    \
+	({                                                       \
+		da_type_test(v, item);                           \
+		darray_find(sizeof(*v.array), &v.da, item, idx); \
+	})
+#else
 #define da_find(v, item, idx) darray_find(sizeof(*v.array), &v.da, item, idx)
+#endif
 
+#ifdef ENABLE_DARRAY_TYPE_TEST
+#define da_push_back(v, item)                                    \
+	({                                                       \
+		da_type_test(v, item);                           \
+		darray_push_back(sizeof(*v.array), &v.da, item); \
+	})
+#else
 #define da_push_back(v, item) darray_push_back(sizeof(*v.array), &v.da, item)
+#endif
 
+#ifdef __GNUC__
+/* GCC 12 with -O2 generates a warning -Wstringop-overflow in da_push_back_new,
+ * which could be false positive. Extract the macro here to avoid the warning.
+ */
+#define da_push_back_new(v)                                                  \
+	({                                                                   \
+		__typeof__(v) *d = &(v);                                     \
+		darray_ensure_capacity(sizeof(*d->array), &d->da, ++d->num); \
+		memset(&d->array[d->num - 1], 0, sizeof(*d->array));         \
+		&d->array[d->num - 1];                                       \
+	})
+#else
 #define da_push_back_new(v) darray_push_back_new(sizeof(*v.array), &v.da)
+#endif
 
+#ifdef ENABLE_DARRAY_TYPE_TEST
+#define da_push_back_array(dst, src_array, n)                                  \
+	({                                                                     \
+		da_type_test(dst, src_array);                                  \
+		darray_push_back_array(sizeof(*dst.array), &dst.da, src_array, \
+				       n);                                     \
+	})
+#else
 #define da_push_back_array(dst, src_array, n) \
 	darray_push_back_array(sizeof(*dst.array), &dst.da, src_array, n)
+#endif
 
+#ifdef ENABLE_DARRAY_TYPE_TEST
+#define da_push_back_da(dst, src)                                              \
+	({                                                                     \
+		da_type_test(dst, src.array);                                  \
+		darray_push_back_darray(sizeof(*dst.array), &dst.da, &src.da); \
+	})
+#else
 #define da_push_back_da(dst, src) \
 	darray_push_back_darray(sizeof(*dst.array), &dst.da, &src.da)
+#endif
 
+#ifdef ENABLE_DARRAY_TYPE_TEST
+#define da_insert(v, idx, item)                                    \
+	({                                                         \
+		da_type_test(v, item);                             \
+		darray_insert(sizeof(*v.array), &v.da, idx, item); \
+	})
+#else
 #define da_insert(v, idx, item) \
 	darray_insert(sizeof(*v.array), &v.da, idx, item)
+#endif
 
 #define da_insert_new(v, idx) darray_insert_new(sizeof(*v.array), &v.da, idx)
 
+#ifdef ENABLE_DARRAY_TYPE_TEST
+#define da_insert_array(dst, idx, src_array, n)                       \
+	({                                                            \
+		da_type_test(dst, src_array);                         \
+		darray_insert_array(sizeof(*dst.array), &dst.da, idx, \
+				    src_array, n);                    \
+	})
+#else
 #define da_insert_array(dst, idx, src_array, n) \
 	darray_insert_array(sizeof(*dst.array), &dst.da, idx, src_array, n)
+#endif
 
+#ifdef ENABLE_DARRAY_TYPE_TEST
+#define da_insert_da(dst, idx, src)                                    \
+	({                                                             \
+		da_type_test(dst, src.array);                          \
+		darray_insert_darray(sizeof(*dst.array), &dst.da, idx, \
+				     &src.da);                         \
+	})
+#else
 #define da_insert_da(dst, idx, src) \
 	darray_insert_darray(sizeof(*dst.array), &dst.da, idx, &src.da)
+#endif
 
 #define da_erase(dst, idx) darray_erase(sizeof(*dst.array), &dst.da, idx)
 
+#ifdef ENABLE_DARRAY_TYPE_TEST
+#define da_erase_item(dst, item)                                      \
+	({                                                            \
+		da_type_test(dst, item);                              \
+		darray_erase_item(sizeof(*dst.array), &dst.da, item); \
+	})
+#else
 #define da_erase_item(dst, item) \
 	darray_erase_item(sizeof(*dst.array), &dst.da, item)
+#endif
 
 #define da_erase_range(dst, from, to) \
 	darray_erase_range(sizeof(*dst.array), &dst.da, from, to)

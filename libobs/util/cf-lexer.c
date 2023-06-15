@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013 Hugh Bailey <obs.jim@gmail.com>
+ * Copyright (c) 2023 Lain Bailey <lain@obsproject.com>
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -393,8 +393,9 @@ static bool cf_lexer_nexttoken(struct cf_lexer *lex, struct cf_token *out_token)
 	}
 
 	if (wrote_data) {
-		out_token->unmerged_str.len = (size_t)(
-			lex->base_lexer.offset - out_token->unmerged_str.array);
+		out_token->unmerged_str.len =
+			(size_t)(lex->base_lexer.offset -
+				 out_token->unmerged_str.array);
 		out_token->type = cf_get_token_type(out_token, &start_token);
 	}
 

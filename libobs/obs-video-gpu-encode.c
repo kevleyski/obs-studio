@@ -1,5 +1,5 @@
 /******************************************************************************
-    Copyright (C) 2018 by Hugh Bailey <obs.jim@gmail.com>
+    Copyright (C) 2023 by Lain Bailey <lain@obsproject.com>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -17,14 +17,12 @@
 
 #include "obs-internal.h"
 
-static void *gpu_encode_thread(void *unused)
+static void *gpu_encode_thread(struct obs_core_video_mix *video)
 {
-	struct obs_core_video *video = &obs->video;
-	uint64_t interval = video_output_get_frame_time(obs->video.video);
+	uint64_t interval = video_output_get_frame_time(video->video);
 	DARRAY(obs_encoder_t *) encoders;
 	int wait_frames = NUM_ENCODE_TEXTURE_FRAMES_TO_WAIT;
 
-	UNUSED_PARAMETER(unused);
 	da_init(encoders);
 
 	os_set_thread_name("obs gpu encode thread");
@@ -90,6 +88,12 @@ static void *gpu_encode_thread(void *unused)
 			if (video_pause_check(&encoder->pause, timestamp))
 				continue;
 
+			if (encoder->reconfigure_requested) {
+				encoder->reconfigure_requested = false;
+				encoder->info.update(encoder->context.data,
+						     encoder->context.settings);
+			}
+
 			if (!encoder->start_ts)
 				encoder->start_ts = timestamp;
 
@@ -143,10 +147,11 @@ static void *gpu_encode_thread(void *unused)
 	return NULL;
 }
 
-bool init_gpu_encoding(struct obs_core_video *video)
+bool init_gpu_encoding(struct obs_core_video_mix *video)
 {
 #ifdef _WIN32
-	struct obs_video_info *ovi = &video->ovi;
+	const struct video_output_info *info =
+		video_output_get_info(video->video);
 
 	video->gpu_encode_stop = false;
 
@@ -155,9 +160,15 @@ bool init_gpu_encoding(struct obs_core_video *video)
 		gs_texture_t *tex;
 		gs_texture_t *tex_uv;
 
-		gs_texture_create_nv12(&tex, &tex_uv, ovi->output_width,
-				       ovi->output_height,
-				       GS_RENDER_TARGET | GS_SHARED_KM_TEX);
+		if (info->format == VIDEO_FORMAT_P010) {
+			gs_texture_create_p010(
+				&tex, &tex_uv, info->width, info->height,
+				GS_RENDER_TARGET | GS_SHARED_KM_TEX);
+		} else {
+			gs_texture_create_nv12(
+				&tex, &tex_uv, info->width, info->height,
+				GS_RENDER_TARGET | GS_SHARED_KM_TEX);
+		}
 		if (!tex) {
 			return false;
 		}
@@ -177,7 +188,7 @@ bool init_gpu_encoding(struct obs_core_video *video)
 	    0)
 		return false;
 	if (pthread_create(&video->gpu_encode_thread, NULL, gpu_encode_thread,
-			   NULL) != 0)
+			   video) != 0)
 		return false;
 
 	os_event_signal(video->gpu_encode_inactive);
@@ -190,7 +201,7 @@ bool init_gpu_encoding(struct obs_core_video *video)
 #endif
 }
 
-void stop_gpu_encoding_thread(struct obs_core_video *video)
+void stop_gpu_encoding_thread(struct obs_core_video_mix *video)
 {
 	if (video->gpu_encode_thread_initialized) {
 		os_atomic_set_bool(&video->gpu_encode_stop, true);
@@ -200,7 +211,7 @@ void stop_gpu_encoding_thread(struct obs_core_video *video)
 	}
 }
 
-void free_gpu_encoding(struct obs_core_video *video)
+void free_gpu_encoding(struct obs_core_video_mix *video)
 {
 	if (video->gpu_encode_semaphore) {
 		os_sem_destroy(video->gpu_encode_semaphore);

@@ -1,44 +1,47 @@
-project(mac-capture)
+cmake_minimum_required(VERSION 3.22...3.25)
+
+legacy_check()
 
 find_library(COREAUDIO CoreAudio)
 find_library(AUDIOUNIT AudioUnit)
 find_library(COREFOUNDATION CoreFoundation)
 find_library(IOSURF IOSurface)
 find_library(COCOA Cocoa)
+find_library(COREVIDEO CoreVideo)
+find_library(COREMEDIA CoreMedia)
+find_library(SCREENCAPTUREKIT ScreenCaptureKit)
 
-include_directories(${COREAUDIO}
-                    ${AUDIOUNIT}
-                    ${COREFOUNDATION}
-		    ${IOSURF}
-		    ${COCOA})
+add_library(mac-capture MODULE)
+add_library(OBS::capture ALIAS mac-capture)
 
-set(mac-capture_HEADERS
-	audio-device-enum.h
-	window-utils.h)
+target_sources(
+  mac-capture
+  PRIVATE # cmake-format: sortable
+          audio-device-enum.c
+          audio-device-enum.h
+          CGDisplayStream.h
+          mac-audio.c
+          mac-display-capture.m
+          mac-screen-capture.m
+          mac-window-capture.m
+          plugin-main.c
+          window-utils.h
+          window-utils.m)
 
-set(mac-capture_SOURCES
-	plugin-main.c
-	audio-device-enum.c
-	mac-audio.c
-	mac-display-capture.m
-	mac-window-capture.m
-	window-utils.m)
+target_link_libraries(mac-capture PRIVATE OBS::libobs ${COREAUDIO} ${AUDIOUNIT} ${COREFOUNDATION} ${IOSURF} ${COCOA})
 
-set_source_files_properties(mac-display-capture.m
-			    mac-window-capture.m
-			    window-utils.m
-	PROPERTIES LANGUAGE C)
+if(SCREENCAPTUREKIT)
+  target_link_libraries(mac-capture PRIVATE OBS::libobs ${COREVIDEO} ${COREMEDIA}
+                                            "$<LINK_LIBRARY:WEAK_FRAMEWORK,${SCREENCAPTUREKIT}>")
+endif()
 
-add_library(mac-capture MODULE
-	${mac-capture_SOURCES}
-	${mac-capture_HEADERS})
-target_link_libraries(mac-capture
-	libobs
-	${COREAUDIO}
-	${AUDIOUNIT}
-	${COREFOUNDATION}
-	${IOSURF}
-	${COCOA})
-set_target_properties(mac-capture PROPERTIES FOLDER "plugins")
+set_target_properties_obs(
+  mac-capture
+  PROPERTIES FOLDER plugins
+             PREFIX ""
+             XCODE_ATTRIBUTE_CLANG_WARN_SUSPICIOUS_IMPLICIT_CONVERSION YES
+             XCODE_ATTRIBUTE_GCC_WARN_SHADOW YES)
 
-install_obs_plugin_with_data(mac-capture data)
+if(CMAKE_VERSION VERSION_LESS_EQUAL 3.25.0)
+  set_property(TARGET mac-capture PROPERTY XCODE_LINK_BUILD_PHASE_MODE BUILT_ONLY)
+endif()

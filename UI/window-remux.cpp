@@ -21,7 +21,6 @@
 
 #include <QCloseEvent>
 #include <QDirIterator>
-#include <QFileDialog>
 #include <QItemDelegate>
 #include <QLineEdit>
 #include <QMessageBox>
@@ -34,6 +33,7 @@
 #include <QTimer>
 
 #include "qt-wrappers.hpp"
+#include "window-basic-main.hpp"
 
 #include <memory>
 #include <cmath>
@@ -101,7 +101,7 @@ QWidget *RemuxEntryPathItemDelegate::createEditor(
 		};
 
 		QHBoxLayout *layout = new QHBoxLayout();
-		layout->setMargin(0);
+		layout->setContentsMargins(0, 0, 0, 0);
 		layout->setSpacing(0);
 
 		QLineEdit *text = new QLineEdit();
@@ -205,8 +205,7 @@ void RemuxEntryPathItemDelegate::paint(QPainter *painter,
 
 void RemuxEntryPathItemDelegate::handleBrowse(QWidget *container)
 {
-	QString OutputPattern = "(*.mp4 *.flv *.mov *.mkv *.ts *.m3u8)";
-	QString InputPattern = "(*.flv *.mov *.mkv *.ts *.m3u8)";
+	QString ExtensionPattern = "(*.mp4 *.flv *.mov *.mkv *.ts *.m3u8)";
 
 	QLineEdit *text = container->findChild<QLineEdit *>();
 
@@ -216,9 +215,9 @@ void RemuxEntryPathItemDelegate::handleBrowse(QWidget *container)
 
 	bool isSet = false;
 	if (isOutput) {
-		QString newPath = QFileDialog::getSaveFileName(
-			container, QTStr("Remux.SelectTarget"), currentPath,
-			OutputPattern);
+		QString newPath = SaveFile(container,
+					   QTStr("Remux.SelectTarget"),
+					   currentPath, ExtensionPattern);
 
 		if (!newPath.isEmpty()) {
 			container->setProperty(PATH_LIST_PROP,
@@ -226,15 +225,19 @@ void RemuxEntryPathItemDelegate::handleBrowse(QWidget *container)
 			isSet = true;
 		}
 	} else {
-		QStringList paths = QFileDialog::getOpenFileNames(
+		QStringList paths = OpenFiles(
 			container, QTStr("Remux.SelectRecording"), currentPath,
 			QTStr("Remux.OBSRecording") + QString(" ") +
-				InputPattern);
+				ExtensionPattern);
 
 		if (!paths.empty()) {
 			container->setProperty(PATH_LIST_PROP, paths);
 			isSet = true;
 		}
+#ifdef __APPLE__
+		// TODO: Revisit when QTBUG-42661 is fixed
+		container->window()->raise();
+#endif
 	}
 
 	if (isSet)
@@ -349,7 +352,7 @@ bool RemuxQueueModel::setData(const QModelIndex &index, const QVariant &value,
 				endRemoveRows();
 			}
 		} else {
-			if (pathList.size() > 1 &&
+			if (pathList.size() >= 1 &&
 			    index.row() < queue.length()) {
 				queue[index.row()].sourcePath = pathList[0];
 				checkInputPath(index.row());
@@ -367,6 +370,7 @@ bool RemuxQueueModel::setData(const QModelIndex &index, const QVariant &value,
 				for (QString path : pathList) {
 					RemuxQueueEntry entry;
 					entry.sourcePath = path;
+					entry.state = RemuxEntryState::Empty;
 
 					queue.insert(row, entry);
 					row++;
@@ -386,6 +390,7 @@ bool RemuxQueueModel::setData(const QModelIndex &index, const QVariant &value,
 		if (!path.isEmpty()) {
 			RemuxQueueEntry entry;
 			entry.sourcePath = path;
+			entry.state = RemuxEntryState::Empty;
 
 			beginInsertRows(QModelIndex(), queue.length() + 1,
 					queue.length() + 1);
@@ -469,10 +474,18 @@ void RemuxQueueModel::checkInputPath(int row)
 		else
 			entry.state = RemuxEntryState::InvalidPath;
 
+		QString newExt = ".mp4";
+		QString suffix = fileInfo.suffix();
+
+		if (suffix.contains("mov", Qt::CaseInsensitive) ||
+		    suffix.contains("mp4", Qt::CaseInsensitive)) {
+			newExt = ".remuxed." + suffix;
+		}
+
 		if (entry.state == RemuxEntryState::Ready)
 			entry.targetPath = QDir::toNativeSeparators(
 				fileInfo.path() + QDir::separator() +
-				fileInfo.completeBaseName() + ".mp4");
+				fileInfo.completeBaseName() + newExt);
 	}
 
 	if (entry.state == RemuxEntryState::Ready && isProcessing)
@@ -672,6 +685,8 @@ OBSRemux::OBSRemux(const char *path, QWidget *parent, bool autoRemux_)
 		RemuxEntryColumn::State, QHeaderView::ResizeMode::Fixed);
 	ui->tableView->setEditTriggers(
 		QAbstractItemView::EditTrigger::CurrentChanged);
+	ui->tableView->setTextElideMode(Qt::ElideMiddle);
+	ui->tableView->setWordWrap(false);
 
 	installEventFilter(CreateShortcutFilter());
 
@@ -864,8 +879,9 @@ void OBSRemux::beginRemux()
 void OBSRemux::AutoRemux(QString inFile, QString outFile)
 {
 	if (inFile != "" && outFile != "" && autoRemux) {
+		ui->progressBar->setVisible(true);
 		emit remux(inFile, outFile);
-		autoRemuxFile = inFile;
+		autoRemuxFile = outFile;
 	}
 }
 
@@ -928,6 +944,11 @@ void OBSRemux::remuxFinished(bool success)
 
 	if (autoRemux && autoRemuxFile != "") {
 		QTimer::singleShot(3000, this, SLOT(close()));
+
+		OBSBasic *main = OBSBasic::Get();
+		main->ShowStatusBarMessage(
+			QTStr("Basic.StatusBar.AutoRemuxedTo")
+				.arg(autoRemuxFile));
 	}
 
 	remuxNextEntry();

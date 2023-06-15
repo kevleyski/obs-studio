@@ -1,52 +1,42 @@
-if(DISABLE_UPDATE_MODULE)
-	return()
+cmake_minimum_required(VERSION 3.24...3.25)
+
+legacy_check()
+
+option(ENABLE_UPDATER "Build with Windows updater" ON)
+
+if(NOT ENABLE_UPDATER)
+  target_disable_feature(obs "Windows updater")
+  return()
 endif()
 
-if(NOT DEFINED STATIC_ZLIB_PATH OR "${STATIC_ZLIB_PATH}" STREQUAL "")
-	message(STATUS "STATIC_ZLIB_PATH not set, windows updater disabled")
-	return()
+find_package(zstd)
+
+if(NOT TARGET OBS::json11)
+  add_subdirectory("${CMAKE_SOURCE_DIR}/deps/json11" "${CMAKE_BINARY_DIR}/deps/json11")
 endif()
 
-project(updater)
+add_executable(updater WIN32)
 
-include_directories(${OBS_JANSSON_INCLUDE_DIRS})
-include_directories(${LIBLZMA_INCLUDE_DIRS})
-include_directories(SYSTEM "${CMAKE_SOURCE_DIR}/libobs")
-include_directories(${BLAKE2_INCLUDE_DIR})
+target_sources(
+  updater
+  PRIVATE hash.cpp
+          helpers.cpp
+          helpers.hpp
+          http.cpp
+          init-hook-files.c
+          patch.cpp
+          resource.h
+          updater.cpp
+          updater.hpp
+          updater.manifest
+          updater.rc)
 
-set(updater_HEADERS
-	../win-update-helpers.hpp
-	resource.h
-	updater.hpp
-	)
-set(updater_SOURCES
-	../win-update-helpers.cpp
-	init-hook-files.c
-	updater.cpp
-	patch.cpp
-	http.cpp
-	hash.cpp
-	updater.rc
-	updater.manifest
-	)
+target_compile_options(updater PRIVATE $<IF:$<CONFIG:DEBUG>,/MTd,/MT> "/utf-8")
+target_compile_definitions(updater PRIVATE NOMINMAX "PSAPI_VERSION=2")
 
-add_definitions(-DNOMINMAX -DUNICODE -D_UNICODE)
-if(MSVC)
-	add_compile_options($<IF:$<CONFIG:Debug>,/MTd,/MT>)
-endif()
+target_include_directories(updater PRIVATE "${CMAKE_SOURCE_DIR}/libobs" "${CMAKE_SOURCE_DIR}/UI/win-update")
 
-add_executable(updater WIN32
-	${updater_HEADERS}
-	${updater_SOURCES}
-	)
-target_link_libraries(updater
-	${OBS_JANSSON_IMPORT}
-	${STATIC_ZLIB_PATH}
-	lzma
-	blake2
-	psapi
-	comctl32
-	shell32
-	winhttp
-	)
-set_target_properties(updater PROPERTIES FOLDER "frontend")
+target_link_libraries(updater PRIVATE OBS::blake2 OBS::json11 zstd::libzstd_static comctl32 shell32 winhttp)
+target_link_options(updater PRIVATE /IGNORE:4098)
+
+set_target_properties_obs(updater PROPERTIES FOLDER frontend OUTPUT_NAME updater)

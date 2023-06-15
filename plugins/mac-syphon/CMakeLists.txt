@@ -1,90 +1,90 @@
-project(mac-syphon)
+cmake_minimum_required(VERSION 3.22...3.25)
+
+legacy_check()
+
+option(ENABLE_SYPHON "Enable Syphon sharing support" ON)
+if(NOT ENABLE_SYPHON)
+  target_disable(mac-syphon)
+  target_disable_feature(mac-syphon "Syphon sharing support")
+  return()
+else()
+  target_enable_feature(mac-syphon "Syphon sharing support")
+endif()
 
 find_library(COCOA Cocoa)
 find_library(IOSURF IOSurface)
 find_library(SCRIPTINGBRIDGE ScriptingBridge)
-find_package(OpenGL REQUIRED)
+mark_as_advanced(COCOA IOSURF SCRIPTINGBRIDGE)
 
-include_directories(${COCOA}
-		    ${IOSURF}
-		    ${SCRIPTINGBIRDGE}
-		    ${OPENGL_INCLUDE_DIR})
+add_library(syphon-framework STATIC EXCLUDE_FROM_ALL )
+add_library(Syphon::Framework ALIAS syphon-framework)
 
-set(syphon_HEADERS
-	syphon-framework/Syphon_Prefix.pch
-	syphon-framework/Syphon.h
-	syphon-framework/SyphonBuildMacros.h
-	syphon-framework/SyphonCFMessageReceiver.h
-	syphon-framework/SyphonCFMessageSender.h
-	syphon-framework/SyphonClient.h
-	syphon-framework/SyphonClientConnectionManager.h
-	syphon-framework/SyphonDispatch.h
-	syphon-framework/SyphonIOSurfaceImage.h
-	syphon-framework/SyphonImage.h
-	syphon-framework/SyphonMachMessageReceiver.h
-	syphon-framework/SyphonMachMessageSender.h
-	syphon-framework/SyphonMessageQueue.h
-	syphon-framework/SyphonMessageReceiver.h
-	syphon-framework/SyphonMessageSender.h
-	syphon-framework/SyphonMessaging.h
-	syphon-framework/SyphonOpenGLFunctions.h
-	syphon-framework/SyphonPrivate.h
-	syphon-framework/SyphonServer.h
-	syphon-framework/SyphonServerConnectionManager.h
-	syphon-framework/SyphonServerDirectory.h
-	)
+target_sources(
+  syphon-framework
+  PRIVATE syphon-framework/Syphon_Prefix.pch
+          syphon-framework/Syphon.h
+          syphon-framework/SyphonBuildMacros.h
+          syphon-framework/SyphonCFMessageReceiver.m
+          syphon-framework/SyphonCFMessageReceiver.h
+          syphon-framework/SyphonCFMessageSender.h
+          syphon-framework/SyphonCFMessageSender.m
+          syphon-framework/SyphonClient.m
+          syphon-framework/SyphonClient.h
+          syphon-framework/SyphonClientConnectionManager.m
+          syphon-framework/SyphonClientConnectionManager.h
+          syphon-framework/SyphonDispatch.c
+          syphon-framework/SyphonDispatch.h
+          syphon-framework/SyphonIOSurfaceImage.m
+          syphon-framework/SyphonIOSurfaceImage.h
+          syphon-framework/SyphonImage.m
+          syphon-framework/SyphonImage.h
+          syphon-framework/SyphonMachMessageReceiver.m
+          syphon-framework/SyphonMachMessageReceiver.h
+          syphon-framework/SyphonMachMessageSender.m
+          syphon-framework/SyphonMachMessageSender.h
+          syphon-framework/SyphonMessageQueue.m
+          syphon-framework/SyphonMessageQueue.h
+          syphon-framework/SyphonMessageReceiver.m
+          syphon-framework/SyphonMessageReceiver.h
+          syphon-framework/SyphonMessageSender.m
+          syphon-framework/SyphonMessageSender.h
+          syphon-framework/SyphonMessaging.m
+          syphon-framework/SyphonMessaging.h
+          syphon-framework/SyphonOpenGLFunctions.c
+          syphon-framework/SyphonOpenGLFunctions.h
+          syphon-framework/SyphonPrivate.m
+          syphon-framework/SyphonPrivate.h
+          syphon-framework/SyphonServer.m
+          syphon-framework/SyphonServer.h
+          syphon-framework/SyphonServerConnectionManager.m
+          syphon-framework/SyphonServerConnectionManager.h
+          syphon-framework/SyphonServerDirectory.m
+          syphon-framework/SyphonServerDirectory.h)
 
-set(syphon_SOURCES
-	syphon-framework/SyphonCFMessageReceiver.m
-	syphon-framework/SyphonCFMessageSender.m
-	syphon-framework/SyphonClient.m
-	syphon-framework/SyphonClientConnectionManager.m
-	syphon-framework/SyphonDispatch.c
-	syphon-framework/SyphonImage.m
-	syphon-framework/SyphonIOSurfaceImage.m
-	syphon-framework/SyphonMachMessageReceiver.m
-	syphon-framework/SyphonMachMessageSender.m
-	syphon-framework/SyphonMessageQueue.m
-	syphon-framework/SyphonMessageReceiver.m
-	syphon-framework/SyphonMessageSender.m
-	syphon-framework/SyphonMessaging.m
-	syphon-framework/SyphonOpenGLFunctions.c
-	syphon-framework/SyphonPrivate.m
-	syphon-framework/SyphonServer.m
-	syphon-framework/SyphonServerConnectionManager.m
-	syphon-framework/SyphonServerDirectory.m
-	)
+target_compile_options(
+  syphon-framework
+  PRIVATE -include "${CMAKE_CURRENT_SOURCE_DIR}/syphon-framework/Syphon_Prefix.pch" -Wno-error=deprecated-declarations
+  PUBLIC -Wno-error=newline-eof -Wno-error=deprecated-implementations)
 
-add_library(syphon-framework ${syphon_HEADERS}
-	${syphon_SOURCES})
+target_compile_definitions(syphon-framework PUBLIC "SYPHON_UNIQUE_CLASS_NAME_PREFIX=OBS_")
 
-set(mac-syphon_HEADERS
-	)
+target_link_libraries(syphon-framework PUBLIC OpenGL::GL ${COCOA} ${IOSURF})
 
-set(mac-syphon_SOURCES
-	syphon.m
-	plugin-main.c)
+set_target_properties(syphon-framework PROPERTIES FOLDER "plugins/mac-syphon" PREFIX "")
 
-set_source_files_properties(${mac-syphon_SOURCES} ${syphon_SOURCES}
-	PROPERTIES LANGUAGE C)
+add_library(mac-syphon MODULE)
+add_library(OBS::syphon ALIAS mac-syphon)
 
-add_definitions(-DSYPHON_UNIQUE_CLASS_NAME_PREFIX=OBS_ -include
-	${PROJECT_SOURCE_DIR}/syphon-framework/Syphon_Prefix.pch)
+target_sources(mac-syphon PRIVATE syphon.m plugin-main.c)
 
-add_library(mac-syphon MODULE
-	${mac-syphon_SOURCES}
-	${mac-syphon_HEADERS})
+target_compile_options(mac-syphon PRIVATE -include "${CMAKE_CURRENT_SOURCE_DIR}/syphon-framework/Syphon_Prefix.pch"
+                                          -fobjc-arc)
 
-target_link_libraries(mac-syphon
-	libobs
-	syphon-framework
-	${COCOA}
-	${IOSURF}
-	${SCRIPTINGBRIDGE}
-	${OPENGL_gl_LIBRARY})
+target_link_libraries(mac-syphon PRIVATE OBS::libobs Syphon::Framework ${SCRIPTINGBRIDGE})
 
-set_property (TARGET mac-syphon APPEND_STRING PROPERTY
-	COMPILE_FLAGS "-fobjc-arc")
-set_target_properties(mac-syphon PROPERTIES FOLDER "plugins")
-
-install_obs_plugin_with_data(mac-syphon data)
+set_target_properties_obs(
+  mac-syphon
+  PROPERTIES FOLDER "plugins"
+             PREFIX ""
+             XCODE_ATTRIBUTE_CLANG_WARN_SUSPICIOUS_IMPLICIT_CONVERSION YES
+             XCODE_ATTRIBUTE_GCC_WARN_SHADOW YES)

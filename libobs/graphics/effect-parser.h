@@ -1,5 +1,5 @@
 /******************************************************************************
-    Copyright (C) 2013 by Hugh Bailey <obs.jim@gmail.com>
+    Copyright (C) 2023 by Lain Bailey <lain@obsproject.com>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -223,10 +223,10 @@ struct ep_func {
 	char *name, *ret_type, *mapping;
 	struct dstr contents;
 	DARRAY(struct ep_var) param_vars;
-	DARRAY(const char *) func_deps;
-	DARRAY(const char *) struct_deps;
-	DARRAY(const char *) param_deps;
-	DARRAY(const char *) sampler_deps;
+	DARRAY(char *) func_deps;
+	DARRAY(char *) struct_deps;
+	DARRAY(char *) param_deps;
+	DARRAY(char *) sampler_deps;
 	bool written;
 };
 

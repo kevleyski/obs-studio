@@ -1,5 +1,5 @@
 /******************************************************************************
-    Copyright (C) 2015 by Hugh Bailey <obs.jim@gmail.com>
+    Copyright (C) 2023 by Lain Bailey <lain@obsproject.com>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -50,6 +50,8 @@ private:
 	inline OBSSource GetFilter(int row, bool async);
 
 	void UpdateFilters();
+	void UpdateSplitter();
+	void UpdateSplitter(bool show_splitter_frame);
 	void UpdatePropertiesView(int row, bool async);
 
 	static void OBSSourceFilterAdded(void *param, calldata_t *data);
@@ -67,8 +69,11 @@ private:
 
 	void CustomContextMenu(const QPoint &pos, bool async);
 	void EditItem(QListWidgetItem *item, bool async);
+	void DuplicateItem(QListWidgetItem *item);
 
 	void FilterNameEdited(QWidget *editor, QListWidget *list);
+
+	void delete_filter(OBSSource filter);
 
 	bool isAsync;
 
@@ -77,11 +82,13 @@ private:
 	bool editActive = false;
 
 private slots:
-	void AddFilter(OBSSource filter);
+	void AddFilter(OBSSource filter, bool focus = true);
 	void RemoveFilter(OBSSource filter);
 	void ReorderFilters();
 	void RenameAsyncFilter();
 	void RenameEffectFilter();
+	void DuplicateAsyncFilter();
+	void DuplicateEffectFilter();
 	void ResetFilters();
 
 	void AddFilterFromAction();
@@ -106,10 +113,13 @@ private slots:
 	void on_actionMoveUp_triggered();
 	void on_actionMoveDown_triggered();
 
-	void AsyncFilterNameEdited(QWidget *editor,
-				   QAbstractItemDelegate::EndEditHint endHint);
-	void EffectFilterNameEdited(QWidget *editor,
-				    QAbstractItemDelegate::EndEditHint endHint);
+	void on_actionRenameFilter_triggered();
+
+	void AsyncFilterNameEdited(QWidget *editor);
+	void EffectFilterNameEdited(QWidget *editor);
+
+	void CopyFilter();
+	void PasteFilter();
 
 public:
 	OBSBasicFilters(QWidget *parent, OBSSource source_);
@@ -117,6 +127,19 @@ public:
 
 	void Init();
 
+	inline void UpdateSource(obs_source_t *target)
+	{
+		if (source == target)
+			UpdateFilters();
+	}
+
 protected:
 	virtual void closeEvent(QCloseEvent *event) override;
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+	virtual bool nativeEvent(const QByteArray &eventType, void *message,
+				 qintptr *result) override;
+#else
+	virtual bool nativeEvent(const QByteArray &eventType, void *message,
+				 long *result) override;
+#endif
 };

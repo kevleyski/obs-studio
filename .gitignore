@@ -3,30 +3,31 @@
 *.dll
 *.dylib
 *.so
+*.plugin
+*.framework
+*.systemextension
 
 #cmake
-/cmbuild/
-/build/
-/build32/
-/build64/
-/release/
-/release32/
-/release64/
-/debug/
-/debug32/
-/debug64/
-/builds/
+/build*/
+!/build-aux/
+/release*/
+/debug*/
 .vs/
 *.o.d
 *.ninja
 .ninja*
 .dirstamp
+/cmake/.CMakeBuildNumber
+.deps
+CMakeUserPresets.json
 
 #xcode
 *.xcodeproj/
+/xcodebuild/
 
 #clion
 .idea/
+cmake-build-debug/
 
 #other stuff (windows stuff, qt moc stuff, etc)
 Release_MD/
@@ -38,6 +39,8 @@ GeneratedFiles/
 .moc/
 /UI/obs.rc
 .vscode/
+/CI/include/*.lock.json
+install_temp/
 
 /other/
 
@@ -59,7 +62,6 @@ __pycache__
 #random useless file stuff
 *.dmg
 *.app
-.DS_Store
 .directory
 .hg
 .depend
@@ -97,3 +99,10 @@ tags
 .DS_Store
 */.DS_Store
 */**/.DS_Store
+
+#flatpak
+/.flatpak-builder/
+/_flatpak_build/
+/flatpak_app/
+/repo/
+/CI/flatpak/flatpak-github-action-modified-*
