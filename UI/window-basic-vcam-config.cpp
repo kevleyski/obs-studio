@@ -1,7 +1,7 @@
 #include "window-basic-vcam-config.hpp"
 #include "window-basic-main.hpp"
-#include "qt-wrappers.hpp"
 
+#include <qt-wrappers.hpp>
 #include <util/util.hpp>
 #include <util/platform.h>
 
@@ -21,7 +21,7 @@ OBSBasicVCamConfig::OBSBasicVCamConfig(const VCamConfig &_config,
 
 	ui->outputType->addItem(QTStr("Basic.VCam.OutputType.Program"),
 				(int)VCamOutputType::ProgramView);
-	ui->outputType->addItem(QTStr("Preview"),
+	ui->outputType->addItem(QTStr("StudioMode.Preview"),
 				(int)VCamOutputType::PreviewOutput);
 	ui->outputType->addItem(QTStr("Basic.Scene"),
 				(int)VCamOutputType::SceneOutput);
@@ -31,8 +31,8 @@ OBSBasicVCamConfig::OBSBasicVCamConfig(const VCamConfig &_config,
 	ui->outputType->setCurrentIndex(
 		ui->outputType->findData((int)config.type));
 	OutputTypeChanged();
-	connect(ui->outputType, SIGNAL(currentIndexChanged(int)), this,
-		SLOT(OutputTypeChanged()));
+	connect(ui->outputType, &QComboBox::currentIndexChanged, this,
+		&OBSBasicVCamConfig::OutputTypeChanged);
 
 	connect(ui->buttonBox, &QDialogButtonBox::accepted, this,
 		&OBSBasicVCamConfig::UpdateConfig);

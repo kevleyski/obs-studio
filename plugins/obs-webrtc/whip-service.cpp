@@ -1,10 +1,11 @@
 #include "whip-service.h"
 
-const char *audio_codecs[MAX_CODECS] = {"opus"};
-const char *video_codecs[MAX_CODECS] = {"h264"};
+const char *audio_codecs[] = {"opus", nullptr};
+const char *video_codecs[] = {"h264", "hevc", "av1", nullptr};
 
 WHIPService::WHIPService(obs_data_t *settings, obs_service_t *)
-	: server(), bearer_token()
+	: server(),
+	  bearer_token()
 {
 	Update(settings);
 }
@@ -32,7 +33,6 @@ void WHIPService::ApplyEncoderSettings(obs_data_t *video_settings, obs_data_t *)
 	// For now, ensure maximum compatibility with webrtc peers
 	if (video_settings) {
 		obs_data_set_int(video_settings, "bf", 0);
-		obs_data_set_string(video_settings, "rate_control", "CBR");
 		obs_data_set_bool(video_settings, "repeat_headers", true);
 	}
 }
@@ -75,7 +75,9 @@ void register_whip_service()
 	info.get_properties = [](void *) -> obs_properties_t * {
 		return WHIPService::Properties();
 	};
-	info.get_protocol = [](void *) -> const char * { return "WHIP"; };
+	info.get_protocol = [](void *) -> const char * {
+		return "WHIP";
+	};
 	info.get_url = [](void *priv_data) -> const char * {
 		return static_cast<WHIPService *>(priv_data)->server.c_str();
 	};

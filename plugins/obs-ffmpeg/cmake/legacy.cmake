@@ -2,6 +2,7 @@ project(obs-ffmpeg)
 
 option(ENABLE_FFMPEG_LOGGING "Enables obs-ffmpeg logging" OFF)
 option(ENABLE_NEW_MPEGTS_OUTPUT "Use native SRT/RIST mpegts output" ON)
+option(ENABLE_NATIVE_NVENC "Use native NVENC implementation" ON)
 
 find_package(
   FFmpeg REQUIRED
@@ -15,6 +16,14 @@ find_package(
 
 add_library(obs-ffmpeg MODULE)
 add_library(OBS::ffmpeg ALIAS obs-ffmpeg)
+
+if(NOT TARGET OBS::media-playback)
+  add_subdirectory("${CMAKE_SOURCE_DIR}/shared/media-playback" "${CMAKE_BINARY_DIR}/shared/media-playback")
+endif()
+
+if(NOT TARGET OBS::opts-parser)
+  add_subdirectory("${CMAKE_SOURCE_DIR}/shared/opts-parser" "${CMAKE_BINARY_DIR}/shared/opts-parser")
+endif()
 
 add_subdirectory(ffmpeg-mux)
 if(ENABLE_NEW_MPEGTS_OUTPUT)
@@ -42,6 +51,7 @@ target_sources(
           obs-ffmpeg-av1.c
           obs-ffmpeg-nvenc.c
           obs-ffmpeg-output.c
+          obs-ffmpeg-output.h
           obs-ffmpeg-mux.c
           obs-ffmpeg-mux.h
           obs-ffmpeg-hls-mux.c
@@ -109,8 +119,16 @@ if(OS_WINDOWS)
 elseif(OS_POSIX AND NOT OS_MACOS)
   find_package(Libva REQUIRED)
   find_package(Libpci REQUIRED)
+  find_package(Libdrm REQUIRED)
   target_sources(obs-ffmpeg PRIVATE obs-ffmpeg-vaapi.c vaapi-utils.c vaapi-utils.h)
-  target_link_libraries(obs-ffmpeg PRIVATE Libva::va Libva::drm LIBPCI::LIBPCI)
+  target_link_libraries(obs-ffmpeg PRIVATE Libva::va Libva::drm LIBPCI::LIBPCI Libdrm::Libdrm)
+
+  if(ENABLE_NATIVE_NVENC)
+    find_package(FFnvcodec 12.0.0.0...<12.2.0.0 REQUIRED)
+    target_sources(obs-ffmpeg PRIVATE obs-nvenc.c obs-nvenc.h obs-nvenc-helpers.c obs-nvenc-ver.h)
+    target_link_libraries(obs-ffmpeg PRIVATE FFnvcodec::FFnvcodec OBS::obsglad)
+    target_compile_definitions(obs-ffmpeg PRIVATE NVCODEC_AVAILABLE)
+  endif()
 endif()
 
 setup_plugin_target(obs-ffmpeg)

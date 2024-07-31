@@ -32,7 +32,6 @@
 #include "obs-config.h"
 #include "obs-defs.h"
 #include "obs-data.h"
-#include "obs-ui.h"
 #include "obs-properties.h"
 #include "obs-interaction.h"
 
@@ -47,6 +46,7 @@ struct obs_scene;
 struct obs_scene_item;
 struct obs_output;
 struct obs_encoder;
+struct obs_encoder_group;
 struct obs_service;
 struct obs_module;
 struct obs_fader;
@@ -60,6 +60,7 @@ typedef struct obs_scene obs_scene_t;
 typedef struct obs_scene_item obs_sceneitem_t;
 typedef struct obs_output obs_output_t;
 typedef struct obs_encoder obs_encoder_t;
+typedef struct obs_encoder_group obs_encoder_group_t;
 typedef struct obs_service obs_service_t;
 typedef struct obs_module obs_module_t;
 typedef struct obs_fader obs_fader_t;
@@ -163,6 +164,7 @@ struct obs_transform_info {
 	enum obs_bounds_type bounds_type;
 	uint32_t bounds_alignment;
 	struct vec2 bounds;
+	bool crop_to_bounds;
 };
 
 /**
@@ -517,6 +519,14 @@ EXPORT const char *obs_get_module_data_path(obs_module_t *module);
  */
 EXPORT void obs_add_module_path(const char *bin, const char *data);
 
+/**
+ * Adds a module to the list of modules allowed to load in Safe Mode.
+ * If the list is empty, all modules are allowed.
+ *
+ * @param  name  Specifies the module's name (filename sans extension).
+ */
+EXPORT void obs_add_safe_module(const char *name);
+
 /** Automatically loads all modules from module paths (convenience function) */
 EXPORT void obs_load_all_modules(void);
 
@@ -824,6 +834,8 @@ typedef bool (*obs_enum_audio_device_cb)(void *data, const char *name,
 
 EXPORT bool obs_audio_monitoring_available(void);
 
+EXPORT void obs_reset_audio_monitoring(void);
+
 EXPORT void obs_enum_audio_monitoring_devices(obs_enum_audio_device_cb cb,
 					      void *data);
 
@@ -848,6 +860,9 @@ EXPORT void obs_remove_main_rendered_callback(void (*rendered)(void *param),
 
 EXPORT void obs_add_raw_video_callback(
 	const struct video_scale_info *conversion,
+	void (*callback)(void *param, struct video_data *frame), void *param);
+EXPORT void obs_add_raw_video_callback2(
+	const struct video_scale_info *conversion, uint32_t frame_rate_divisor,
 	void (*callback)(void *param, struct video_data *frame), void *param);
 EXPORT void obs_remove_raw_video_callback(
 	void (*callback)(void *param, struct video_data *frame), void *param);
@@ -939,8 +954,14 @@ EXPORT video_t *obs_view_add2(obs_view_t *view, struct obs_video_info *ovi);
 EXPORT void obs_view_remove(obs_view_t *view);
 
 /** Gets the video settings currently in use for this view context, returns false if no video */
-EXPORT bool obs_view_get_video_info(obs_view_t *view,
-				    struct obs_video_info *ovi);
+OBS_DEPRECATED EXPORT bool obs_view_get_video_info(obs_view_t *view,
+						   struct obs_video_info *ovi);
+
+/** Enumerate the video info of all mixes using the specified view context */
+EXPORT void obs_view_enum_video_info(obs_view_t *view,
+				     bool (*enum_proc)(void *,
+						       struct obs_video_info *),
+				     void *param);
 
 /* ------------------------------------------------------------------------- */
 /* Display context */
@@ -1130,6 +1151,14 @@ EXPORT void obs_source_filter_set_order(obs_source_t *source,
 					obs_source_t *filter,
 					enum obs_order_movement movement);
 
+/** Gets filter index */
+EXPORT int obs_source_filter_get_index(obs_source_t *source,
+				       obs_source_t *filter);
+
+/** Sets filter index */
+EXPORT void obs_source_filter_set_index(obs_source_t *source,
+					obs_source_t *filter, size_t index);
+
 /** Gets the settings string for a source */
 EXPORT obs_data_t *obs_source_get_settings(const obs_source_t *source);
 
@@ -1300,6 +1329,12 @@ typedef void (*obs_source_audio_capture_t)(void *param, obs_source_t *source,
 					   const struct audio_data *audio_data,
 					   bool muted);
 
+EXPORT void obs_source_add_audio_pause_callback(obs_source_t *source,
+						signal_callback_t callback,
+						void *param);
+EXPORT void obs_source_remove_audio_pause_callback(obs_source_t *source,
+						   signal_callback_t callback,
+						   void *param);
 EXPORT void obs_source_add_audio_capture_callback(
 	obs_source_t *source, obs_source_audio_capture_t callback, void *param);
 EXPORT void obs_source_remove_audio_capture_callback(
@@ -1833,6 +1868,7 @@ EXPORT void obs_sceneitem_set_bounds_type(obs_sceneitem_t *item,
 					  enum obs_bounds_type type);
 EXPORT void obs_sceneitem_set_bounds_alignment(obs_sceneitem_t *item,
 					       uint32_t alignment);
+EXPORT void obs_sceneitem_set_bounds_crop(obs_sceneitem_t *item, bool crop);
 EXPORT void obs_sceneitem_set_bounds(obs_sceneitem_t *item,
 				     const struct vec2 *bounds);
 
@@ -1848,13 +1884,19 @@ EXPORT uint32_t obs_sceneitem_get_alignment(const obs_sceneitem_t *item);
 EXPORT enum obs_bounds_type
 obs_sceneitem_get_bounds_type(const obs_sceneitem_t *item);
 EXPORT uint32_t obs_sceneitem_get_bounds_alignment(const obs_sceneitem_t *item);
+EXPORT bool obs_sceneitem_get_bounds_crop(const obs_sceneitem_t *item);
 EXPORT void obs_sceneitem_get_bounds(const obs_sceneitem_t *item,
 				     struct vec2 *bounds);
-
-EXPORT void obs_sceneitem_get_info(const obs_sceneitem_t *item,
-				   struct obs_transform_info *info);
-EXPORT void obs_sceneitem_set_info(obs_sceneitem_t *item,
-				   const struct obs_transform_info *info);
+OBS_DEPRECATED EXPORT void
+obs_sceneitem_get_info(const obs_sceneitem_t *item,
+		       struct obs_transform_info *info);
+OBS_DEPRECATED EXPORT void
+obs_sceneitem_set_info(obs_sceneitem_t *item,
+		       const struct obs_transform_info *info);
+EXPORT void obs_sceneitem_get_info2(const obs_sceneitem_t *item,
+				    struct obs_transform_info *info);
+EXPORT void obs_sceneitem_set_info2(obs_sceneitem_t *item,
+				    const struct obs_transform_info *info);
 
 EXPORT void obs_sceneitem_get_draw_transform(const obs_sceneitem_t *item,
 					     struct matrix4 *transform);
@@ -2403,6 +2445,46 @@ EXPORT enum obs_encoder_type obs_encoder_get_type(const obs_encoder_t *encoder);
 EXPORT void obs_encoder_set_scaled_size(obs_encoder_t *encoder, uint32_t width,
 					uint32_t height);
 
+/**
+ * Enable/disable GPU based scaling for a video encoder.
+ * OBS_SCALE_DISABLE disables GPU based scaling (default),
+ * any other value enables GPU based scaling. If the encoder
+ * is active, this function will trigger a warning, and do nothing.
+ */
+EXPORT void obs_encoder_set_gpu_scale_type(obs_encoder_t *encoder,
+					   enum obs_scale_type gpu_scale_type);
+
+/**
+ * Set frame rate divisor for a video encoder. This allows recording at
+ * a partial frame rate compared to the base frame rate, e.g. 60 FPS with
+ * divisor = 2 will record at 30 FPS, with divisor = 3 at 20, etc.
+ *
+ * Can only be called on stopped encoders, changing this on the fly is not supported
+ */
+EXPORT bool obs_encoder_set_frame_rate_divisor(obs_encoder_t *encoder,
+					       uint32_t divisor);
+
+/**
+ * Adds region of interest (ROI) for an encoder. This allows prioritizing
+ * quality of regions of the frame.
+ * If regions overlap, regions added earlier take precedence.
+ *
+ * Returns false if the encoder does not support ROI or region is invalid.
+ */
+EXPORT bool obs_encoder_add_roi(obs_encoder_t *encoder,
+				const struct obs_encoder_roi *roi);
+/** For video encoders, returns true if any ROIs were set */
+EXPORT bool obs_encoder_has_roi(const obs_encoder_t *encoder);
+/** Clear all regions */
+EXPORT void obs_encoder_clear_roi(obs_encoder_t *encoder);
+/** Enumerate regions with callback (reverse order of addition) */
+EXPORT void obs_encoder_enum_roi(obs_encoder_t *encoder,
+				 void (*enum_proc)(void *,
+						   struct obs_encoder_roi *),
+				 void *param);
+/** Get ROI increment, encoders must rebuild their ROI map if it has changed */
+EXPORT uint32_t obs_encoder_get_roi_increment(const obs_encoder_t *encoder);
+
 /** For video encoders, returns true if pre-encode scaling is enabled */
 EXPORT bool obs_encoder_scaling_enabled(const obs_encoder_t *encoder);
 
@@ -2411,6 +2493,15 @@ EXPORT uint32_t obs_encoder_get_width(const obs_encoder_t *encoder);
 
 /** For video encoders, returns the height of the encoded image */
 EXPORT uint32_t obs_encoder_get_height(const obs_encoder_t *encoder);
+
+/** For video encoders, returns whether GPU scaling is enabled */
+EXPORT bool obs_encoder_gpu_scaling_enabled(obs_encoder_t *encoder);
+
+/** For video encoders, returns GPU scaling type */
+EXPORT enum obs_scale_type obs_encoder_get_scale_type(obs_encoder_t *encoder);
+
+/** For video encoders, returns the frame rate divisor (default is 1) */
+EXPORT uint32_t obs_encoder_get_frame_rate_divisor(const obs_encoder_t *encoder);
 
 /** For audio encoders, returns the sample rate of the audio */
 EXPORT uint32_t obs_encoder_get_sample_rate(const obs_encoder_t *encoder);
@@ -2470,6 +2561,13 @@ EXPORT void obs_encoder_set_audio(obs_encoder_t *encoder, audio_t *audio);
 EXPORT video_t *obs_encoder_video(const obs_encoder_t *encoder);
 
 /**
+ * Returns the parent video output context used with this encoder, or NULL if not
+ * a video context. Used when an FPS divisor is set, where the original video
+ * context would not otherwise be gettable.
+ */
+EXPORT video_t *obs_encoder_parent_video(const obs_encoder_t *encoder);
+
+/**
  * Returns the audio output context used with this encoder, or NULL if not
  * a audio context
  */
@@ -2510,6 +2608,17 @@ EXPORT void obs_encoder_set_last_error(obs_encoder_t *encoder,
 				       const char *message);
 
 EXPORT uint64_t obs_encoder_get_pause_offset(const obs_encoder_t *encoder);
+
+/**
+ * Creates an "encoder group", allowing synchronized startup of encoders within
+ * the group. Encoder groups are single owner, and hold strong references to
+ * encoders within the group. Calling destroy on an active group will not actually
+ * destroy the group until it becomes completely inactive.
+ */
+EXPORT bool obs_encoder_set_group(obs_encoder_t *encoder,
+				  obs_encoder_group_t *group);
+EXPORT obs_encoder_group_t *obs_encoder_group_create();
+EXPORT void obs_encoder_group_destroy(obs_encoder_group_t *group);
 
 /* ------------------------------------------------------------------------- */
 /* Stream Services */

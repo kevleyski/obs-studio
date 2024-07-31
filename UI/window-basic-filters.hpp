@@ -21,8 +21,7 @@
 #include <QDialogButtonBox>
 #include <memory>
 #include <obs.hpp>
-
-#include "properties-view.hpp"
+#include <properties-view.hpp>
 
 class OBSBasic;
 class QMenu;
@@ -87,11 +86,7 @@ private slots:
 	void ReorderFilters();
 	void RenameAsyncFilter();
 	void RenameEffectFilter();
-	void DuplicateAsyncFilter();
-	void DuplicateEffectFilter();
 	void ResetFilters();
-
-	void AddFilterFromAction();
 
 	void on_addAsyncFilter_clicked();
 	void on_removeAsyncFilter_clicked();
@@ -115,11 +110,12 @@ private slots:
 
 	void on_actionRenameFilter_triggered();
 
-	void AsyncFilterNameEdited(QWidget *editor);
-	void EffectFilterNameEdited(QWidget *editor);
-
 	void CopyFilter();
 	void PasteFilter();
+
+	void FiltersMoved(const QModelIndex &srcParent, int srcIdxStart,
+			  int srcIdxEnd, const QModelIndex &dstParent,
+			  int dstIdx);
 
 public:
 	OBSBasicFilters(QWidget *parent, OBSSource source_);
@@ -135,11 +131,6 @@ public:
 
 protected:
 	virtual void closeEvent(QCloseEvent *event) override;
-#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
 	virtual bool nativeEvent(const QByteArray &eventType, void *message,
 				 qintptr *result) override;
-#else
-	virtual bool nativeEvent(const QByteArray &eventType, void *message,
-				 long *result) override;
-#endif
 };

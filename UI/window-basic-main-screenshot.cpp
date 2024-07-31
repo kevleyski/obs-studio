@@ -17,7 +17,8 @@
 
 #include "window-basic-main.hpp"
 #include "screenshot-obj.hpp"
-#include "qt-wrappers.hpp"
+
+#include <qt-wrappers.hpp>
 
 #ifdef _WIN32
 #include <wincodec.h>
@@ -68,8 +69,8 @@ void ScreenshotObj::Screenshot()
 	OBSSource source = OBSGetStrongRef(weakSource);
 
 	if (source) {
-		cx = obs_source_get_base_width(source);
-		cy = obs_source_get_base_height(source);
+		cx = obs_source_get_width(source);
+		cy = obs_source_get_height(source);
 	} else {
 		obs_video_info ovi;
 		obs_get_video_info(&ovi);
